@@ -1,80 +1,59 @@
-# IPTV Player Web App
+# IPTV Web Player Project
 
-IPTV Player Web App is a simple web-based application that allows you to load and play IPTV (Internet Protocol Television) channels from an M3U playlist. You can search for channels, view their details, and easily play them in a built-in video player.
-Demo: https://afzafri.github.io/IPTV-Player-Web-App
+Web aplikacija za učitavanje i reprodukciju IPTV kanala putem Xtream Codes prijave. Aplikacija podržava grupe kanala, pretraživanje, EPG i tamno sučelje.
 
-## Features
+## Mogućnosti
 
-- Load IPTV channels from an M3U URL.
-- Search for channels within the playlist.
-- View channel details with logos.
-- Play channels in a user-friendly video player.
-- Your M3U playlists URL are automatically saved to your browser local storage and auto load the next time you visit the page.
+- Xtream Codes prijava putem servera, korisničkog imena i lozinke.
+- Automatsko pamćenje podataka za prijavu u lokalnom pregledniku.
+- Prikaz i skrivanje lozinke pomoću ikone oka.
+- Automatsko učitavanje IPTV kanala i grupa koje šalje provider.
+- Pretraživanje kanala.
+- Reprodukcija HLS, MPEG-TS, DASH i ClearKey streamova.
+- Automatsko učitavanje EPG-a iz Xtream XMLTV izvora.
+- Prikaz četiri sljedeće emisije ispod playera.
+- Tamna tema prilagođena desktopu i mobitelu.
+- Lokalni proxy za providerove redirecte i CORS ograničenja.
 
-### Issues
+## Pokretanje
 
-- Will not work on iOS due to missing DRM support on iOS
-- If the M3U source URL has CORS restrictions, this web app won’t be able to fetch the data due to client-side limitations
-- Most Video/Stream links might not be playable due to CORS blocking
-- ~~Only able to parse M3U file contents that are formatted with a line-break between each channels~~
-- ~~Need a better way to read M3U file~~
+Potrebni su Python i moderan web preglednik, preporučeno Firefox.
 
+1. Otvorite mapu projekta u terminalu.
+2. Pokrenite lokalni server i proxy:
 
-## Getting Started
-
-Follow these instructions to get the project up and running on your local machine.
-
-### Prerequisites
-
-You need a modern web browser and a web server (for serving static files).
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/your-username/IPTV-Player-Web-App.git
+   ```powershell
+   python local_server.py
    ```
 
-2. Open the project folder in your code editor.
+3. Otvorite:
 
-3. Run a web server, or you can use Python's built-in HTTP server:
-
-    ```bash
-   python -m http.server
+   ```text
+   http://localhost:8000/index.html
    ```
 
-4. Open a web browser and access the project by visiting `http://localhost:8000` (or your server's URL).
+4. Unesite Xtream server, korisničko ime i lozinku.
+5. Kliknite `UCITAJ LISTU`.
+6. Odaberite grupu i zatim kanal.
 
-### Usage
+## EPG
 
-1. Enter the M3U URL of your IPTV playlist in the "Enter M3U URL" input field.
+EPG se učitava automatski iz Xtream XMLTV izvora. Ako provider ne šalje ispravan EPG ili blokira pristup, programi se neće prikazati.
 
-2. Click the "Go" button to load the playlist.
+## Napomene
 
-3. You can search for channels by entering keywords in the "Search Channel" input field.
+- Streamovi ovise o provideru, njegovim serverima i dostupnosti kanala.
+- Neki streamovi mogu imati CORS, DRM ili kodek ograničenja.
+- Firefox se preporučuje za određene MPEG-TS streamove.
+- Lokalni `local_server.py` mora ostati pokrenut dok koristite aplikaciju.
+- Podaci za Xtream prijavu čuvaju se u `localStorage` preglednika. Nemojte koristiti javno ili dijeljeno računalo za osjetljive podatke.
 
-4. Click on a channel in the playlist to start playing it in the video player.
+## Datoteke
 
-5. Enjoy your favorite IPTV channels!
+- `index.html` - glavno sučelje IPTV playera.
+- `local_server.py` - lokalni HTTP server i proxy za streamove.
+- `clearkey-test.html` - jednostavna ClearKey testna stranica.
 
-### Saving M3U URL
+## Licenca
 
-- **M3U URL**: If you enter an M3U URL and load the playlist, the URL will be saved to local storage. When you return to the application, the URL will be prepopulated in the input field for your convenience.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Acknowledgments
-
-- [Shaka Player](https://github.com/shaka-project/shaka-player) for enabling video streaming.
-- [Bootstrap](https://getbootstrap.com/) for styling and layout.
-
-## Contributing
-
-Feel free to contribute to this project. You can submit issues, feature requests, or pull requests to help improve this IPTV Player Web App.
-
-## Authors
-
-- Afif Zafri
+Projekt je objavljen pod MIT licencom. Detalji se nalaze u datoteci `LICENSE`.
