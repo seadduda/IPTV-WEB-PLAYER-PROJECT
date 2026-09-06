@@ -354,9 +354,10 @@
                             document.getElementById('epgStatus').textContent = 'EPG adresa nije pronađena u IPTV listi.';
                         }
 
-                        const groups = [...new Set(playlistItems
-                            .map(item => item.groupTitle && item.groupTitle.trim())
-                            .filter(Boolean))];
+                        const groups = [...new Map(playlistItems
+                            .map(item => [normalizeGroupName(item.groupTitle), item.groupTitle && item.groupTitle.trim()])
+                            .filter(([normalizedGroup]) => normalizedGroup)
+                        ).values()];
                         groupSelect.innerHTML = '<option value="">All groups</option>';
                         groups.forEach(group => {
                             const option = document.createElement('option');
@@ -406,7 +407,8 @@
             const normalizedSearch = searchText.trim().toLowerCase();
 
             return playlistItems.filter(item => {
-                const belongsToGroup = !selectedGroup || item.groupTitle === selectedGroup;
+                const belongsToGroup = !selectedGroup
+                    || normalizeGroupName(item.groupTitle) === normalizeGroupName(selectedGroup);
                 const matchesSearch = !normalizedSearch || (item.tvgName || '').toLowerCase().includes(normalizedSearch);
                 return belongsToGroup && matchesSearch;
             });
@@ -443,7 +445,7 @@
         function getPlayableSource(source) {
             try {
                 const sourceUrl = new URL(source);
-                if (sourceUrl.origin !== window.location.origin && /\/live\//i.test(sourceUrl.pathname)) {
+                if (sourceUrl.origin !== window.location.origin && ['http:', 'https:'].includes(sourceUrl.protocol)) {
                     return `${window.location.origin}/proxy?url=${encodeURIComponent(source)}`;
                 }
             } catch (error) {
@@ -459,6 +461,14 @@
             }
 
             return source;
+        }
+
+        function isMovieOrKidsGroup(groupTitle) {
+            return /film|movie|kids|child|djec|dječ|crtani|cartoon|series|serije/i.test(groupTitle || '');
+        }
+
+        function normalizeGroupName(groupTitle) {
+            return (groupTitle || '').trim().replace(/\s+/g, ' ').toLowerCase();
         }
 
         async function canLoadHlsManifest(source) {
@@ -532,8 +542,10 @@
                             mpegtsPlayer = null;
                         }
 
-                        const hlsSource = item.source;
-                        const isHlsStream = /\.m3u8(?:$|[?#])/i.test(item.source);
+                        const preferCategoryHls = isMovieOrKidsGroup(item.groupTitle);
+                        const hlsSource = preferCategoryHls ? getHlsSource(item.source) : item.source;
+                        const isHlsStream = /\.m3u8(?:$|[?#])/i.test(item.source)
+                            || (preferCategoryHls && hlsSource !== item.source);
                         const isMpegTsStream = !isHlsStream && (/\.ts(?:$|[?#])/i.test(item.source) || /\/live\//i.test(item.source));
                         const isProgressiveStream = /\.(?:mp4|webm|ogg)(?:$|[?#])/i.test(item.source);
                         const playableSource = getPlayableSource(item.source);
@@ -628,7 +640,7 @@
                         }
 
                         if (isProgressiveStream && !item.key) {
-                            videoPlayer.src = item.source;
+                            videoPlayer.src = playableSource;
                             videoPlayer.classList.remove("d-none");
                             await videoPlayer.play().catch(() => {});
                             renderEpgForChannel(item);
@@ -715,7 +727,7 @@
                         }
 
                         console.log('Loading source:', item.source);
-                        await player.load(item.source);
+                        await player.load(playableSource);
                         console.log('Source loaded successfully');
 
                         videoPlayer.scrollIntoView({ behavior: 'smooth' });
@@ -798,9 +810,9 @@
                         currentItem.tvgId = tvgIdMatch[1];
                     }
 
-                    const groupTitleMatch = line.match(/group-title="([^"]+)"/);
+                    const groupTitleMatch = line.match(/group-title\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s,]+))/i);
                     if (groupTitleMatch) {
-                        currentItem.groupTitle = groupTitleMatch[1];
+                        currentItem.groupTitle = (groupTitleMatch[1] || groupTitleMatch[2] || groupTitleMatch[3] || '').trim();
                     }
 
                     const tvgNameMatch = line.match(/tvg-name="([^"]+)"/);
