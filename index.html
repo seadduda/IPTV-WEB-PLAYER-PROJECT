@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Streaming App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        :root {
+            --dark-bg: #111827;
+            --dark-panel: #1f2937;
+            --dark-panel-soft: #273449;
+            --dark-border: #374151;
+            --dark-text: #f3f4f6;
+            --dark-muted: #9ca3af;
+            --dark-accent: #60a5fa;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+        }
+
+        #playlist {
+            background-color: var(--dark-panel);
+            border-right: 1px solid var(--dark-border);
+            height: 100vh;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        #playlistItemsContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .channel {
+            align-items: center;
+            background-color: var(--dark-panel-soft);
+            border: 1px solid var(--dark-border);
+            border-radius: 6px;
+            min-height: 58px;
+            overflow: hidden;
+            padding: 8px !important;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .channel:hover {
+            background-color: #334155;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        .channel-name {
+            flex: 1;
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #videoPlayer {
+            width: 100%;
+            height: auto;
+        }
+
+        .input-group-btn {
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-go {
+            margin-left: 10px;
+        }
+
+        .tv-logo {
+            background-color: #f9fafb;
+            border-radius: 4px;
+            height: 40px;
+            margin-right: 10px;
+            object-fit: contain;
+            padding: 2px;
+            width: 52px;
+        }
+
+        .channel:hover {
+            cursor: pointer;
+        }
+
+        /* CSS for the billed message */
+        .billed-msg {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: #030712;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        /* Search bar styles */
+        .search-bar {
+            margin-bottom: 10px;
+        }
+
+        .group-select {
+            margin-bottom: 10px;
+        }
+
+        .form-control,
+        .form-select {
+            background-color: var(--dark-panel-soft);
+            border-color: var(--dark-border);
+            color: var(--dark-text);
+        }
+
+        .form-control::placeholder {
+            color: var(--dark-muted);
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background-color: var(--dark-panel-soft);
+            border-color: var(--dark-accent);
+            color: var(--dark-text);
+        }
+
+        .form-select option {
+            background-color: var(--dark-panel);
+            color: var(--dark-text);
+        }
+
+        #videoPlayer {
+            background-color: #000000;
+            border: 1px solid var(--dark-border);
+            border-radius: 6px;
+        }
+
+        #epgSection {
+            background-color: var(--dark-panel);
+            border: 1px solid var(--dark-border);
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        #epgTitle {
+            color: var(--dark-text);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        #epgStatus {
+            color: var(--dark-muted);
+            font-size: 0.85rem;
+            margin: 10px 0;
+        }
+
+        #epgList {
+            display: grid;
+            gap: 6px;
+        }
+
+        #xtreamLogin {
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        #xtreamLogin .row {
+            --bs-gutter-x: 8px;
+        }
+
+        .password-field {
+            display: flex;
+        }
+
+        .password-field .form-control {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .password-toggle {
+            border-color: var(--dark-border);
+            border-left: 0;
+            border-radius: 0 0.375rem 0.375rem 0;
+            white-space: nowrap;
+        }
+
+        .epg-program {
+            background-color: var(--dark-panel-soft);
+            border-left: 3px solid var(--dark-accent);
+            border-radius: 4px;
+            padding: 9px 12px;
+        }
+
+        .epg-program-time {
+            color: var(--dark-accent);
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        .epg-program-title {
+            color: var(--dark-text);
+        }
+
+        .epg-empty {
+            color: var(--dark-muted);
+            padding: 10px;
+        }
+
+        @media (max-width: 767.98px) {
+            #playlist {
+                border-right: 0;
+                border-bottom: 1px solid var(--dark-border);
+                height: 42vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid h-100">
+        <div class="row d-flex justify-content-center h-100">
+            <div class="col-md-9 order-md-2">
+                <div class="row">
+                    <div class="col-12 order-2 order-md-1">
+                        <div id="xtreamLogin">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <input type="url" id="xtreamServer" class="form-control" placeholder="Xtream server">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" id="xtreamUsername" class="form-control" placeholder="Username">
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="password-field">
+                                        <input type="password" id="xtreamPassword" class="form-control" placeholder="Password">
+                                        <button id="togglePassword" class="btn btn-outline-light password-toggle" type="button" aria-label="Prikaži lozinku" title="Prikaži lozinku">&#128065;</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <button id="loadM3U" class="btn btn-primary w-100" type="button">UCITAJ LISTU</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 order-1 order-md-2">
+                        <video id="videoPlayer" controls autoplay class="d-none"></video>
+                    </div>
+
+                    <div class="col-12 order-3 mt-3" id="epgSection">
+                        <div id="epgTitle">EPG</div>
+                        <div id="epgStatus">EPG se automatski učitava iz IPTV liste.</div>
+                        <div id="epgList">
+                            <div class="epg-empty">EPG programs will appear here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 order-md-1" id="playlist">
+                <select id="groupSelect" class="form-select group-select" aria-label="Select channel group">
+                    <option value="">Channel groups</option>
+                </select>
+                <input type="text" id="searchInput" class="form-control search-bar" placeholder="Search Channel">
+                <div class="d-flex align-items-center text-secondary mt-4" id="channel-placeholder">No channel found</div>
+                <div id="playlistItemsContainer">
+                    <!-- Playlist items will be added here -->
+                </div>
+           </div>
+        </div>
+    </div>
+    <div id="billedMsg" class="billed-msg d-none"></div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.0/shaka-player.compiled.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mpegts.js@latest/dist/mpegts.min.js"></script>
+    <script>
+        // Define an array to store all playlist items
+        let playlistItems = [];
+        let player = null;
+        let hlsPlayer = null;
+        let mpegtsPlayer = null;
+        let epgPrograms = [];
+        let selectedEpgChannel = '';
+        let selectedGroup = '';
+        const hlsProbeCache = new Map();
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const videoPlayer = document.getElementById("videoPlayer");
+            const playlist = document.getElementById("playlist");
+            const playlistItemsContainer = document.getElementById("playlistItemsContainer");
+            const loadM3UButton = document.getElementById("loadM3U");
+            const xtreamServerInput = document.getElementById("xtreamServer");
+            const xtreamUsernameInput = document.getElementById("xtreamUsername");
+            const xtreamPasswordInput = document.getElementById("xtreamPassword");
+            const togglePasswordButton = document.getElementById("togglePassword");
+            const billedMsgElement = document.getElementById("billedMsg");
+            const groupSelect = document.getElementById("groupSelect");
+            const searchInput = document.getElementById("searchInput");
+            const channelPlaceholder = document.getElementById("channel-placeholder");
+
+            const savedXtream = JSON.parse(localStorage.getItem('xtreamLogin') || '{}');
+            xtreamServerInput.value = savedXtream.server || '';
+            xtreamUsernameInput.value = savedXtream.username || '';
+            xtreamPasswordInput.value = savedXtream.password || '';
+
+            togglePasswordButton.addEventListener('click', () => {
+                const isPasswordHidden = xtreamPasswordInput.type === 'password';
+                xtreamPasswordInput.type = isPasswordHidden ? 'text' : 'password';
+                togglePasswordButton.innerHTML = '&#128065;';
+                togglePasswordButton.setAttribute('aria-label', isPasswordHidden ? 'Sakrij lozinku' : 'Prikaži lozinku');
+                togglePasswordButton.title = isPasswordHidden ? 'Sakrij lozinku' : 'Prikaži lozinku';
+            });
+
+            loadM3UButton.addEventListener("click", () => {
+                localStorage.setItem('xtreamLogin', JSON.stringify({
+                    server: xtreamServerInput.value.trim(),
+                    username: xtreamUsernameInput.value.trim(),
+                    password: xtreamPasswordInput.value
+                }));
+                const m3uURL = buildXtreamPlaylistUrl(xtreamServerInput.value, xtreamUsernameInput.value, xtreamPasswordInput.value);
+                if (!m3uURL) {
+                    document.getElementById('epgStatus').textContent = 'Unesi podatke za IPTV prijavu.';
+                    return;
+                }
+                localStorage.setItem("m3uPlaylistURL", m3uURL);
+
+                // Load and parse the M3U file from the user-provided URL
+                fetch(m3uURL)
+                    .then(response => response.text())
+                    .then(data => {
+                        videoPlayer.innerHTML = ''; // Clear the video player
+                        clearPlaylist(); // clear channel list
+
+                        const parsedPlaylist = parseM3U(data);
+                        playlistItems = parsedPlaylist.items;
+
+                        const automaticEpgUrl = parsedPlaylist.epgUrl || getXtreamEpgUrl(m3uURL);
+                        if (automaticEpgUrl) {
+                            loadEPG(automaticEpgUrl);
+                        } else {
+                            document.getElementById('epgStatus').textContent = 'EPG adresa nije pronađena u IPTV listi.';
+                        }
+
+                        const groups = [...new Set(playlistItems
+                            .map(item => item.groupTitle && item.groupTitle.trim())
+                            .filter(Boolean))];
+                        groupSelect.innerHTML = '<option value="">All groups</option>';
+                        groups.forEach(group => {
+                            const option = document.createElement('option');
+                            option.value = group;
+                            option.textContent = group;
+                            groupSelect.appendChild(option);
+                        });
+                        selectedGroup = groups[0] || '';
+                        groupSelect.value = selectedGroup;
+
+                        // Render the playlist
+                        renderPlaylist(getFilteredPlaylistItems(searchInput.value));
+
+                        if (document.getElementsByClassName('channel').length > 0) {
+                            channelPlaceholder.classList.add("d-none");
+                        } else {
+                            channelPlaceholder.classList.remove("d-none");
+                        }
+
+                        if (parsedPlaylist.billedMsg) {
+                            billedMsgElement.textContent = parsedPlaylist.billedMsg;
+                            billedMsgElement.classList.remove("d-none");
+                        } else {
+                            billedMsgElement.classList.add("d-none");
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error loading the M3U file:", error);
+                    });
+            });
+
+            // Search input event listener
+            searchInput.addEventListener("input", () => {
+                // Render the filtered playlist
+                clearPlaylist(false);
+                renderPlaylist(getFilteredPlaylistItems(searchInput.value));
+            });
+
+            groupSelect.addEventListener("change", () => {
+                selectedGroup = groupSelect.value;
+                clearPlaylist(false);
+                renderPlaylist(getFilteredPlaylistItems(searchInput.value));
+            });
+        });
+
+        function getFilteredPlaylistItems(searchText = '') {
+            const normalizedSearch = searchText.trim().toLowerCase();
+
+            return playlistItems.filter(item => {
+                const belongsToGroup = !selectedGroup || item.groupTitle === selectedGroup;
+                const matchesSearch = !normalizedSearch || (item.tvgName || '').toLowerCase().includes(normalizedSearch);
+                return belongsToGroup && matchesSearch;
+            });
+        }
+
+        function getXtreamEpgUrl(playlistUrl) {
+            try {
+                const parsedUrl = new URL(playlistUrl);
+                const username = parsedUrl.searchParams.get('username');
+                const password = parsedUrl.searchParams.get('password');
+                if (!username || !password) {
+                    return '';
+                }
+
+                return `${parsedUrl.origin}/xmltv.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function buildXtreamPlaylistUrl(server, username, password) {
+            if (!server.trim() || !username.trim() || !password.trim()) {
+                return '';
+            }
+
+            try {
+                const serverUrl = new URL(server.trim());
+                return `${serverUrl.origin}/get.php?username=${encodeURIComponent(username.trim())}&password=${encodeURIComponent(password.trim())}&type=m3u_plus&output=ts`;
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function getPlayableSource(source) {
+            try {
+                const sourceUrl = new URL(source);
+                if (sourceUrl.origin !== window.location.origin && /\/live\//i.test(sourceUrl.pathname)) {
+                    return `${window.location.origin}/proxy?url=${encodeURIComponent(source)}`;
+                }
+            } catch (error) {
+                return source;
+            }
+
+            return source;
+        }
+
+        function getHlsSource(source) {
+            if (/\/live\//i.test(source) && /\.ts(?:$|[?#])/i.test(source)) {
+                return source.replace(/\.ts(?=$|[?#])/i, '.m3u8');
+            }
+
+            return source;
+        }
+
+        async function canLoadHlsManifest(source) {
+            if (/\.m3u8(?:$|[?#])/i.test(source)) {
+                return true;
+            }
+
+            if (hlsProbeCache.has(source)) {
+                return hlsProbeCache.get(source);
+            }
+
+            const hlsCandidate = getHlsSource(source);
+            if (hlsCandidate === source) {
+                hlsProbeCache.set(source, false);
+                return false;
+            }
+
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 2500);
+                const response = await fetch(getPlayableSource(hlsCandidate), {
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+                if (!response.ok) {
+                    hlsProbeCache.set(source, false);
+                    return false;
+                }
+                const manifest = await response.text();
+                const isValidManifest = manifest.trimStart().startsWith('#EXTM3U');
+                hlsProbeCache.set(source, isValidManifest);
+                return isValidManifest;
+            } catch (error) {
+                hlsProbeCache.set(source, false);
+                return false;
+            }
+        }
+
+        // Function to render the playlist
+        function renderPlaylist(items, target = playlistItemsContainer) {
+            items.forEach((item, index) => {
+                const playlistItem = document.createElement("div");
+                playlistItem.className = "channel d-flex p-3";
+
+                if (item.tvgLogo) {
+                    const logoImage = document.createElement("img");
+                    logoImage.src = item.tvgLogo;
+                    logoImage.className = "tv-logo";
+                    playlistItem.appendChild(logoImage);
+                }
+
+                const channelName = document.createElement("span");
+                channelName.className = "channel-name";
+                channelName.textContent = item.tvgName || `Stream ${index + 1}`;
+                playlistItem.appendChild(channelName);
+
+                playlistItem.addEventListener("click", async () => {
+                    clearErrorMessage();
+                    try {
+                        if (player !== null) {
+                            await player.destroy();
+                            player = null;
+                        }
+                        if (hlsPlayer !== null) {
+                            hlsPlayer.destroy();
+                            hlsPlayer = null;
+                        }
+                        if (mpegtsPlayer !== null) {
+                            mpegtsPlayer.destroy();
+                            mpegtsPlayer = null;
+                        }
+
+                        const hlsSource = item.source;
+                        const isHlsStream = /\.m3u8(?:$|[?#])/i.test(item.source);
+                        const isMpegTsStream = !isHlsStream && (/\.ts(?:$|[?#])/i.test(item.source) || /\/live\//i.test(item.source));
+                        const isProgressiveStream = /\.(?:mp4|webm|ogg)(?:$|[?#])/i.test(item.source);
+                        const playableSource = getPlayableSource(item.source);
+                        if (isHlsStream && typeof Hls !== 'undefined' && Hls.isSupported() && !item.key) {
+                            hlsPlayer = new Hls({
+                                lowLatencyMode: true,
+                                startFragPrefetch: true,
+                                liveSyncDurationCount: 1,
+                                maxBufferLength: 10,
+                                maxMaxBufferLength: 20
+                            });
+                            hlsPlayer.loadSource(getPlayableSource(hlsSource));
+                            hlsPlayer.attachMedia(videoPlayer);
+                            hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+                                videoPlayer.play().catch(() => {});
+                            });
+                            hlsPlayer.on(Hls.Events.ERROR, (_, errorData) => {
+                                if (errorData.fatal) {
+                                    onPlayerError({
+                                        code: errorData.response?.code || errorData.type || 'HLS',
+                                        message: errorData.details || 'HLS stream could not be loaded.'
+                                    });
+                                }
+                            });
+                            videoPlayer.classList.remove("d-none");
+                            renderEpgForChannel(item);
+                            return;
+                        }
+
+                        if (isMpegTsStream && typeof mpegts !== 'undefined' && mpegts.isSupported() && !item.key) {
+                            let hlsFallbackAttempted = false;
+                            let mpegTsPlaybackStarted = false;
+                            let mediaResetAttempted = false;
+                            mpegtsPlayer = mpegts.createPlayer({
+                                type: 'mpegts',
+                                isLive: true,
+                                url: playableSource
+                            }, {
+                                enableWorker: false,
+                                enableStashBuffer: true,
+                                stashInitialSize: 1024 * 1024,
+                                lazyLoad: false,
+                                fixAudioTimestampGap: true,
+                                liveBufferLatencyChasing: false
+                            });
+                            mpegtsPlayer.attachMediaElement(videoPlayer);
+                            videoPlayer.addEventListener('playing', () => {
+                                mpegTsPlaybackStarted = true;
+                            }, { once: true });
+                            mpegtsPlayer.on(mpegts.Events.ERROR, async (errorType, errorDetail) => {
+                                const normalizedErrorType = String(errorType || '').toLowerCase();
+                                if (normalizedErrorType.includes('mediasourcerequiresreset') && !mediaResetAttempted) {
+                                    mediaResetAttempted = true;
+                                    mpegtsPlayer.unload();
+                                    mpegtsPlayer.load();
+                                    mpegtsPlayer.play().catch(() => {});
+                                    return;
+                                }
+
+                                if (!hlsFallbackAttempted && /mse|mediasource/.test(normalizedErrorType) && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                                    hlsFallbackAttempted = true;
+                                    const hlsFallbackSource = getHlsSource(item.source);
+                                    if (await canLoadHlsManifest(item.source)) {
+                                        mpegtsPlayer.destroy();
+                                        mpegtsPlayer = null;
+                                        hlsPlayer = new Hls({
+                                            lowLatencyMode: true,
+                                            startFragPrefetch: true,
+                                            liveSyncDurationCount: 1,
+                                            maxBufferLength: 10,
+                                            maxMaxBufferLength: 20
+                                        });
+                                        hlsPlayer.loadSource(getPlayableSource(hlsFallbackSource));
+                                        hlsPlayer.attachMedia(videoPlayer);
+                                        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+                                            videoPlayer.play().catch(() => {});
+                                        });
+                                        return;
+                                    }
+                                }
+
+                                onPlayerError({
+                                    code: errorType || 'MPEGTS',
+                                    message: errorDetail || 'MPEG-TS stream could not be loaded.'
+                                });
+                            });
+                            mpegtsPlayer.load();
+                            mpegtsPlayer.play().catch(() => {});
+                            videoPlayer.classList.remove("d-none");
+                            renderEpgForChannel(item);
+                            return;
+                        }
+
+                        if (isProgressiveStream && !item.key) {
+                            videoPlayer.src = item.source;
+                            videoPlayer.classList.remove("d-none");
+                            await videoPlayer.play().catch(() => {});
+                            renderEpgForChannel(item);
+                            return;
+                        }
+
+                        player = new shaka.Player(videoPlayer);
+
+                        // Add error event listener
+                        let mpegTsFallbackAttempted = false;
+                        player.addEventListener('error', async (event) => {
+                            const shakaError = event.detail || event;
+                            const isMseError = shakaError.code === 3016 || shakaError.code === 'MEDIA.MSE_ERROR';
+                            if (isMseError && !mpegTsFallbackAttempted && typeof mpegts !== 'undefined' && mpegts.isSupported() && !item.key) {
+                                mpegTsFallbackAttempted = true;
+                                await player.destroy();
+                                player = null;
+                                mpegtsPlayer = mpegts.createPlayer({
+                                    type: 'mpegts',
+                                    isLive: true,
+                                    url: playableSource
+                                }, {
+                                    enableWorker: false,
+                                    enableStashBuffer: true,
+                                    stashInitialSize: 1024 * 1024,
+                                    lazyLoad: false,
+                                    fixAudioTimestampGap: true,
+                                    liveBufferLatencyChasing: false
+                                });
+                                mpegtsPlayer.attachMediaElement(videoPlayer);
+                                mpegtsPlayer.on(mpegts.Events.ERROR, (errorType, errorDetail) => {
+                                    onPlayerError({
+                                        code: errorType || 'MPEGTS',
+                                        message: errorDetail || 'MPEG-TS stream could not be loaded.'
+                                    });
+                                });
+                                mpegtsPlayer.load();
+                                mpegtsPlayer.play().catch(() => {});
+                                videoPlayer.classList.remove("d-none");
+                                renderEpgForChannel(item);
+                                return;
+                            }
+                            onPlayerError(shakaError);
+                        });
+
+                        // Configure network filters
+                        player.getNetworkingEngine().registerRequestFilter(function(type, request) {
+                            console.log('Outgoing request:', type, request);
+                        });
+
+                        player.getNetworkingEngine().registerResponseFilter(function(type, response) {
+                            console.log('Incoming response:', type, response);
+                        });
+
+                        if (item.key) {
+                            console.log('Key information:', item.key);
+                            if (item.key.license_type === 'clearkey' && item.key.license_key) {
+                                console.log('Configuring for URL-based license key');
+                                player.configure({
+                                    drm: {
+                                        servers: {
+                                            'org.w3.clearkey': item.key.license_key
+                                        }
+                                    }
+                                });
+                            } else if (item.key.key_id && item.key.key) {
+                                console.log('Configuring for direct key values');
+                                player.configure({
+                                    drm: {
+                                        clearKeys: {
+                                            [item.key.key_id]: item.key.key
+                                        }
+                                    }
+                                });
+                            } else if (item.key.raw_key) {
+                                console.log('Configuring for raw key');
+                                // You might need to adjust this based on how your raw key should be used
+                                player.configure({
+                                    drm: {
+                                        clearKeys: item.key.raw_key
+                                    }
+                                });
+                            }
+                        }
+
+                        console.log('Loading source:', item.source);
+                        await player.load(item.source);
+                        console.log('Source loaded successfully');
+
+                        videoPlayer.scrollIntoView({ behavior: 'smooth' });
+                        videoPlayer.classList.remove("d-none");
+
+                        renderEpgForChannel(item);
+                    } catch (error) {
+                        console.error('Error in renderPlaylist:', error);
+                        onPlayerError(error);
+                        videoPlayer.classList.add("d-none");
+                    }
+                });
+
+                target.appendChild(playlistItem);
+            });
+        }
+
+        function onPlayerError(error) {
+            console.error('Detailed error information:', error);
+            
+            // You can add more specific error handling here
+            if (error.code === shaka.util.Error.Code.DASH_INVALID_XML) {
+                console.error('Invalid DASH manifest');
+            } else if (error.code === shaka.util.Error.Code.BAD_HTTP_STATUS) {
+                console.error('Bad HTTP status');
+            }
+            
+            // Clear any existing error messages
+            clearErrorMessage();
+
+            // Display an error message to the user
+            const errorMessage = document.createElement('div');
+            errorMessage.classList.add('video-error-message');  // Add a class for easy identification
+            const errorCode = String(error.code || '');
+            const isMediaMseError = error.code === 3016
+                || errorCode === 'MEDIA.MSE_ERROR'
+                || /MediaMSEError|MSE_ERROR/i.test(errorCode);
+            const errorText = error.code === 1002
+                ? 'Stream nije podržan ili ga server blokira (Shaka 1002).'
+                : isMediaMseError
+                    ? 'Ovaj kanal koristi video/audio kodek koji Chrome ne podržava. Probaj drugi kanal ili VLC.'
+                : `Error loading video: ${error.message || error.code}`;
+            errorMessage.textContent = errorText;
+            errorMessage.style.color = 'red';
+            videoPlayer.parentNode.insertBefore(errorMessage, videoPlayer.nextSibling);
+        }
+
+        function clearErrorMessage() {
+            // Clear any existing error messages
+            const existingErrorMessage = document.querySelector('.video-error-message');
+            if (existingErrorMessage) {
+                existingErrorMessage.remove();
+            }
+        }
+
+        function parseM3U(content) {
+            const lines = content.split('\n');
+            const items = [];
+            let currentItem = null;
+            let billedMsg = '';
+            let epgUrl = '';
+
+            for (let line of lines) {
+                line = line.trim();
+
+                if (line.startsWith('#EXTM3U')) {
+                    const billedMsgMatch = line.match(/billed-msg="([^"]+)"/);
+                    if (billedMsgMatch) {
+                        billedMsg = billedMsgMatch[1];
+                    }
+                    const epgUrlMatch = line.match(/(?:url-tvg|x-tvg-url)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s]+))/i);
+                    if (epgUrlMatch) {
+                        epgUrl = epgUrlMatch[1] || epgUrlMatch[2] || epgUrlMatch[3];
+                    }
+                } else if (line.startsWith('#EXTINF:')) {
+                    currentItem = { tvgName: '', tvgLogo: '', groupTitle: '', source: '', key: null };
+
+                    const tvgIdMatch = line.match(/tvg-id="([^"]+)"/);
+                    if (tvgIdMatch) {
+                        currentItem.tvgId = tvgIdMatch[1];
+                    }
+
+                    const groupTitleMatch = line.match(/group-title="([^"]+)"/);
+                    if (groupTitleMatch) {
+                        currentItem.groupTitle = groupTitleMatch[1];
+                    }
+
+                    const tvgNameMatch = line.match(/tvg-name="([^"]+)"/);
+                    if (tvgNameMatch) {
+                        currentItem.tvgName = tvgNameMatch[1];
+                    } else {
+                        const lastCommaIndex = line.lastIndexOf(",");
+                        if (lastCommaIndex !== -1) {
+                            currentItem.tvgName = line.substring(lastCommaIndex + 1).trim();
+                        }
+                    }
+
+                    const tvgLogoMatch = line.match(/tvg-logo="([^"]+)"/);
+                    if (tvgLogoMatch) {
+                        currentItem.tvgLogo = convertToHttps(tvgLogoMatch[1]);
+                    }
+
+                    // console.log('Parsed EXTINF:', currentItem);
+                } else if (line.startsWith('#KODIPROP:')) {
+                    if (currentItem) {
+                        const keyInfo = extractKey(line);
+                        if (keyInfo) {
+                            if (!currentItem.key) currentItem.key = {};
+                            Object.assign(currentItem.key, keyInfo);
+                            // console.log('Extracted key info:', keyInfo);
+                        }
+                    }
+                } else if (line.length > 0 && !line.startsWith('#')) {
+                    if (currentItem) {
+                        currentItem.source = line;
+                        items.push(currentItem);
+                        // console.log('Added item:', currentItem);
+                        currentItem = null;
+                    }
+                }
+            }
+
+            // console.log('Parsed M3U items:', items);
+            return { items, billedMsg, epgUrl };
+        }
+
+        function extractKey(line) {
+            if (line.includes('inputstream.adaptive.license_type=')) {
+                return { license_type: line.split('=')[1].trim().toLowerCase() };
+            } else if (line.includes('inputstream.adaptive.license_key=')) {
+                const keyValue = line.split('=')[1].trim();
+                
+                // Check if it's a URL
+                if (keyValue.startsWith('http')) {
+                    return { license_key: keyValue };
+                }
+                
+                // Check if it's a direct key (format: key_id:key)
+                const keyParts = keyValue.split(':');
+                if (keyParts.length === 2) {
+                    return {
+                        key_id: normalizeClearKeyValue(keyParts[0]),
+                        key: normalizeClearKeyValue(keyParts[1])
+                    };
+                }
+                
+                // Try parsing as JSON
+                try {
+                    const json = JSON.parse(keyValue);
+                    if (json && json.keys && json.keys.length > 0) {
+                        return {
+                            key_id: base64ToHex(json.keys[0].kid),
+                            key: base64ToHex(json.keys[0].k)
+                        };
+                    }
+                } catch (error) {
+                    // If it's not valid JSON, treat it as a raw key
+                    console.log('Key is not in JSON format, treating as raw key:', keyValue);
+                    return { raw_key: keyValue };
+                }
+            }
+            return null;
+        }
+
+        function normalizeClearKeyValue(value) {
+            const normalizedValue = value.trim();
+            if (/^[a-f0-9]{32}$/i.test(normalizedValue)) {
+                return normalizedValue.toLowerCase();
+            }
+
+            return base64ToHex(normalizedValue);
+        }
+
+        function clearPlaylist(clearItems = true) {
+            // Clear the existing playlist items
+            if (clearItems) {
+                playlistItems = [];
+            }
+
+            const playlistItemsElem = playlistItemsContainer.querySelectorAll('.channel');
+            playlistItemsElem.forEach(item => item.remove());
+        }
+
+        function trimLineBreak(text) {
+            // Replace multiple line breaks with a single line break
+            return text.replace(/[\r\n]{2,}/g, '\n\n');
+        }
+
+        function reorderIndexes(items) {
+            let rearrangedItems = [];
+
+            items.forEach(item => {
+                if (item !== undefined) {
+                    rearrangedItems.push(item);
+                }
+            });
+
+            return rearrangedItems;
+        }
+
+        function base64ToHex(base64) {
+            if (base64.length > 0) {
+                const binary = atob(base64);
+                let hex = '';
+                for (let i = 0; i < binary.length; i++) {
+                    let char = binary.charCodeAt(i).toString(16);
+                    hex += (char.length === 1 ? '0' : '') + char;
+                }
+                return hex;
+            }
+            return base64;
+        }
+
+        function convertToHttps(url) {
+            return url.replace(/^http:/, 'https:');
+        }
+
+        function extractKey(line) {
+            const prefix = '#KODIPROP:inputstream.adaptive.license_key=';
+            const extractedValue = line.substring(line.indexOf(prefix) + prefix.length);
+
+            try {
+                var json = JSON.parse(extractedValue);
+                if (json && json.keys.length > 0) {
+                    const KEY = base64ToHex(json.keys[0].k); // Value of 'k' (KEY)
+                    const ID = base64ToHex(json.keys[0].kid); // Value of 'kid' (ID)
+
+                    return {
+                        'key_id': ID,
+                        'key': KEY
+                    };
+                } else {
+                    return null;
+                }
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function loadEPG(url) {
+            const epgStatus = document.getElementById('epgStatus');
+            if (!url) {
+                epgStatus.textContent = 'Enter an XMLTV URL or load a playlist with an EPG address.';
+                return;
+            }
+
+            epgStatus.textContent = 'Loading EPG...';
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const xmlText = await response.text();
+                const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+                if (xml.querySelector('parsererror')) {
+                    throw new Error('Invalid XMLTV data');
+                }
+
+                epgPrograms = Array.from(xml.querySelectorAll('programme')).map(program => ({
+                    channel: program.getAttribute('channel') || '',
+                    startValue: program.getAttribute('start') || '',
+                    endValue: program.getAttribute('stop') || '',
+                    start: formatEpgDate(program.getAttribute('start') || ''),
+                    end: formatEpgDate(program.getAttribute('stop') || ''),
+                    startTimestamp: parseEpgTimestamp(program.getAttribute('start') || ''),
+                    title: program.querySelector('title')?.textContent.trim() || 'Untitled program',
+                    description: program.querySelector('desc')?.textContent.trim() || ''
+                })).sort((first, second) => first.startTimestamp - second.startTimestamp);
+                epgStatus.textContent = 'EPG učitan';
+                renderEpg();
+            } catch (error) {
+                epgPrograms = [];
+                epgStatus.textContent = `EPG could not be loaded: ${error.message}. Check the URL or CORS settings.`;
+                renderEpg();
+            }
+        }
+
+        function renderEpgForChannel(item) {
+            selectedEpgChannel = item.tvgId || item.tvgName || '';
+            renderEpg();
+        }
+
+        function renderEpg() {
+            const epgList = document.getElementById('epgList');
+            const matchingPrograms = selectedEpgChannel
+                ? epgPrograms.filter(program => program.channel === selectedEpgChannel)
+                : epgPrograms;
+
+            epgList.innerHTML = '';
+            if (matchingPrograms.length === 0) {
+                const emptyMessage = document.createElement('div');
+                emptyMessage.className = 'epg-empty';
+                emptyMessage.textContent = selectedEpgChannel
+                    ? 'No EPG programs found for this channel.'
+                    : 'EPG programs will appear here.';
+                epgList.appendChild(emptyMessage);
+                return;
+            }
+
+            const currentTime = Date.now();
+            const upcomingPrograms = matchingPrograms.filter(program => {
+                return !program.startTimestamp || program.startTimestamp >= currentTime;
+            });
+            const programsToShow = (upcomingPrograms.length ? upcomingPrograms : matchingPrograms).slice(0, 4);
+
+            programsToShow.forEach(program => {
+                const programElement = document.createElement('div');
+                programElement.className = 'epg-program';
+                programElement.innerHTML = `<span class="epg-program-time">${program.start} - ${program.end}</span><span class="epg-program-title">${escapeHtml(program.title)}</span>`;
+                if (program.description) {
+                    programElement.title = program.description;
+                }
+                epgList.appendChild(programElement);
+            });
+        }
+
+        function formatEpgDate(value) {
+            const match = value.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
+            if (!match) {
+                return '--:--';
+            }
+
+            return `${match[4]}:${match[5]}`;
+        }
+
+        function parseEpgTimestamp(value) {
+            const match = value.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
+            if (!match) {
+                return 0;
+            }
+
+            return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]));
+        }
+
+        function escapeHtml(value) {
+            return value.replace(/[&<>'"]/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[character]));
+        }
+
+
+    </script>
+</body>
+</html>
