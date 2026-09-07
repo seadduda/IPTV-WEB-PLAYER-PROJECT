@@ -15,7 +15,12 @@ class LocalPlayerHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            request = Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            range_header = self.headers.get('Range')
+            if range_header:
+                headers['Range'] = range_header
+
+            request = Request(target_url, headers=headers)
             opener = build_opener(HTTPRedirectHandler())
             response = None
             for attempt in range(3):
@@ -29,6 +34,19 @@ class LocalPlayerHandler(SimpleHTTPRequestHandler):
             if response is None:
                 raise RuntimeError('The provider did not return a response.')
             content_type = response.headers.get('Content-Type', 'video/mp2t')
+            target_path = urlparse(response.geturl()).path.lower()
+            # Only trust the extension when the provider didn't already send a real video/* type,
+            # otherwise an HTML error page would be mislabeled as playable video.
+            if content_type.lower().startswith('text/html'):
+                pass
+            elif target_path.endswith('.mp4'):
+                content_type = 'video/mp4'
+            elif target_path.endswith('.webm'):
+                content_type = 'video/webm'
+            elif target_path.endswith('.ogg'):
+                content_type = 'video/ogg'
+            elif target_path.endswith('.mkv'):
+                content_type = 'video/x-matroska'
             is_manifest = 'mpegurl' in content_type.lower() or urlparse(response.geturl()).path.lower().endswith('.m3u8')
             if is_manifest:
                 manifest = response.read().decode('utf-8', errors='replace')
@@ -53,6 +71,13 @@ class LocalPlayerHandler(SimpleHTTPRequestHandler):
 
             self.send_response(response.status)
             self.send_header('Content-Type', content_type)
+            self.send_header('Accept-Ranges', 'bytes')
+            content_length = response.headers.get('Content-Length')
+            if content_length:
+                self.send_header('Content-Length', content_length)
+            content_range = response.headers.get('Content-Range')
+            if content_range:
+                self.send_header('Content-Range', content_range)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Cache-Control', 'no-cache, no-store')
             self.send_header('Connection', 'close')

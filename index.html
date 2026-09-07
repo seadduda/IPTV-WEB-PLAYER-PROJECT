@@ -143,6 +143,22 @@
             border-radius: 6px;
         }
 
+        #movieControls {
+            align-items: center;
+            background-color: var(--dark-panel);
+            border: 1px solid var(--dark-border);
+            border-radius: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 8px;
+        }
+
+        #movieControls .form-select {
+            width: auto;
+        }
+
         #epgSection {
             background-color: var(--dark-panel);
             border: 1px solid var(--dark-border);
@@ -253,6 +269,24 @@
 
                     <div class="col-12 order-1 order-md-2">
                         <video id="videoPlayer" controls autoplay class="d-none"></video>
+                        <div id="movieControls" class="d-none">
+                            <button id="rewindMovie" class="btn btn-outline-light" type="button">-10 s</button>
+                            <button id="forwardMovie" class="btn btn-outline-light" type="button">+10 s</button>
+                            <label class="text-light" for="movieSpeed">Brzina</label>
+                            <select id="movieSpeed" class="form-select" aria-label="Brzina reprodukcije">
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                            <label class="text-light" for="movieSubtitle">Prijevod</label>
+                            <select id="movieSubtitle" class="form-select" aria-label="Odabir prijevoda">
+                                <option value="-1">Nema dostupnog prijevoda</option>
+                            </select>
+                            <span id="movieControlStatus" class="text-secondary"></span>
+                        </div>
                     </div>
 
                     <div class="col-12 order-3 mt-3" id="epgSection">
@@ -310,6 +344,67 @@
             const groupSelect = document.getElementById("groupSelect");
             const searchInput = document.getElementById("searchInput");
             const channelPlaceholder = document.getElementById("channel-placeholder");
+            const movieControls = document.getElementById("movieControls");
+            const movieSubtitle = document.getElementById("movieSubtitle");
+            const movieControlStatus = document.getElementById("movieControlStatus");
+
+            function seekMovie(seconds) {
+                if (Number.isFinite(videoPlayer.duration)) {
+                    videoPlayer.currentTime = Math.max(0, Math.min(videoPlayer.duration, videoPlayer.currentTime + seconds));
+                    return;
+                }
+
+                if (videoPlayer.seekable.length > 0) {
+                    const seekStart = videoPlayer.seekable.start(0);
+                    const seekEnd = videoPlayer.seekable.end(videoPlayer.seekable.length - 1);
+                    const currentTime = Number.isFinite(videoPlayer.currentTime) ? videoPlayer.currentTime : seekEnd;
+                    videoPlayer.currentTime = Math.max(seekStart, Math.min(seekEnd, currentTime + seconds));
+                    movieControlStatus.textContent = '';
+                    return;
+                }
+
+                movieControlStatus.textContent = 'Ovaj stream nema premotavanje.';
+            }
+
+            document.getElementById('rewindMovie').addEventListener('click', () => {
+                seekMovie(-10);
+            });
+            document.getElementById('forwardMovie').addEventListener('click', () => {
+                seekMovie(10);
+            });
+            document.getElementById('movieSpeed').addEventListener('change', event => {
+                videoPlayer.playbackRate = Number(event.target.value);
+            });
+            movieSubtitle.addEventListener('change', event => {
+                if (hlsPlayer !== null) {
+                    hlsPlayer.subtitleTrack = Number(event.target.value);
+                    return;
+                }
+                Array.from(videoPlayer.textTracks).forEach((track, index) => {
+                    track.mode = index === Number(event.target.value) ? 'showing' : 'disabled';
+                });
+            });
+
+            videoPlayer.addEventListener('loadedmetadata', () => {
+                refreshSubtitleOptions();
+            });
+            if (typeof videoPlayer.textTracks.addEventListener === 'function') {
+                videoPlayer.textTracks.addEventListener('addtrack', () => {
+                    refreshSubtitleOptions();
+                });
+            }
+
+            function refreshSubtitleOptions() {
+                movieSubtitle.innerHTML = '<option value="-1">Nema dostupnog prijevoda</option>';
+                Array.from(videoPlayer.textTracks).forEach((track, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = track.label || track.language || `Prijevod ${index + 1}`;
+                    movieSubtitle.appendChild(option);
+                });
+            }
+
+            window.refreshSubtitleOptions = refreshSubtitleOptions;
 
             const savedXtream = JSON.parse(localStorage.getItem('xtreamLogin') || '{}');
             xtreamServerInput.value = savedXtream.server || '';
@@ -342,6 +437,8 @@
                     .then(response => response.text())
                     .then(data => {
                         videoPlayer.innerHTML = ''; // Clear the video player
+                        movieControls.classList.add('d-none');
+                        movieControlStatus.textContent = '';
                         clearPlaylist(); // clear channel list
 
                         const parsedPlaylist = parseM3U(data);
@@ -442,6 +539,50 @@
             }
         }
 
+        async function loadMovieSubtitles(item) {
+            const subtitleSelect = document.getElementById('movieSubtitle');
+            const sourceMatch = item.source.match(/\/(?:movie|series)\/[^/]+\/[^/]+\/(\d+)/i);
+            const serverInput = document.getElementById('xtreamServer');
+            const usernameInput = document.getElementById('xtreamUsername');
+            const passwordInput = document.getElementById('xtreamPassword');
+            if (!sourceMatch || !serverInput || !usernameInput || !passwordInput) {
+                return;
+            }
+
+            try {
+                const server = new URL(serverInput.value.trim());
+                const apiUrl = `${server.origin}/player_api.php?username=${encodeURIComponent(usernameInput.value.trim())}&password=${encodeURIComponent(passwordInput.value)}&action=get_vod_info&vod_id=${sourceMatch[1]}`;
+                const response = await fetch(getPlayableSource(apiUrl), { cache: 'no-store' });
+                if (!response.ok) {
+                    return;
+                }
+
+                const vodInfo = await response.json();
+                const subtitleEntries = vodInfo?.info?.subtitles || vodInfo?.subtitles || vodInfo?.info?.subtitle || [];
+                const entries = Array.isArray(subtitleEntries) ? subtitleEntries : [subtitleEntries];
+                for (const subtitle of entries) {
+                    const subtitleUrl = subtitle.url || subtitle.subtitle_url || subtitle.file || subtitle.source;
+                    if (!subtitleUrl) {
+                        continue;
+                    }
+
+                    const track = document.createElement('track');
+                    track.kind = 'subtitles';
+                    track.default = false;
+                    track.track.mode = 'hidden';
+                    track.label = subtitle.label || subtitle.name || subtitle.language || subtitle.lang || 'Prijevod';
+                    track.srclang = subtitle.language || subtitle.lang || 'und';
+                    track.src = getPlayableSource(subtitleUrl);
+                    document.getElementById('videoPlayer').appendChild(track);
+                }
+                if (typeof window.refreshSubtitleOptions === 'function') {
+                    window.refreshSubtitleOptions();
+                }
+            } catch (error) {
+                console.warn('Titlovi nisu učitani:', error);
+            }
+        }
+
         function getPlayableSource(source) {
             try {
                 const sourceUrl = new URL(source);
@@ -461,6 +602,20 @@
             }
 
             return source;
+        }
+
+        function getVodSource(source) {
+            return source;
+        }
+
+        function getVodCandidates(source) {
+            if (/\/(?:movie|series)\/.*\.(?:mkv|mp4)(?:$|[?#])/i.test(source)) {
+                const mkvSource = source.replace(/\.(?:mkv|mp4)(?=$|[?#])/i, '.mkv');
+                const mp4Source = source.replace(/\.(?:mkv|mp4)(?=$|[?#])/i, '.mp4');
+                return [mkvSource, mp4Source].filter((candidate, index, candidates) => candidates.indexOf(candidate) === index);
+            }
+
+            return [source];
         }
 
         function isMovieOrKidsGroup(groupTitle) {
@@ -541,14 +696,21 @@
                             mpegtsPlayer.destroy();
                             mpegtsPlayer = null;
                         }
+                        if (videoPlayer._vodErrorHandler) {
+                            videoPlayer.removeEventListener('error', videoPlayer._vodErrorHandler);
+                            videoPlayer._vodErrorHandler = null;
+                        }
+                        movieControls.classList.add('d-none');
 
                         const preferCategoryHls = isMovieOrKidsGroup(item.groupTitle);
                         const hlsSource = preferCategoryHls ? getHlsSource(item.source) : item.source;
                         const isHlsStream = /\.m3u8(?:$|[?#])/i.test(item.source)
                             || (preferCategoryHls && hlsSource !== item.source);
                         const isMpegTsStream = !isHlsStream && (/\.ts(?:$|[?#])/i.test(item.source) || /\/live\//i.test(item.source));
-                        const isProgressiveStream = /\.(?:mp4|webm|ogg)(?:$|[?#])/i.test(item.source);
-                        const playableSource = getPlayableSource(item.source);
+                        const isVodStream = /\/(?:movie|series)\//i.test(item.source);
+                        const vodSource = getVodSource(item.source);
+                        const isProgressiveStream = isVodStream || /\.(?:mp4|mkv|webm|ogg)(?:$|[?#])/i.test(vodSource);
+                        const playableSource = getPlayableSource(vodSource);
                         if (isHlsStream && typeof Hls !== 'undefined' && Hls.isSupported() && !item.key) {
                             hlsPlayer = new Hls({
                                 lowLatencyMode: true,
@@ -562,6 +724,15 @@
                             hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
                                 videoPlayer.play().catch(() => {});
                             });
+                            hlsPlayer.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_, data) => {
+                                movieSubtitle.innerHTML = '<option value="-1">Nema dostupnog prijevoda</option>';
+                                (data.subtitleTracks || []).forEach((track, index) => {
+                                    const option = document.createElement('option');
+                                    option.value = index;
+                                    option.textContent = track.name || track.lang || `Prijevod ${index + 1}`;
+                                    movieSubtitle.appendChild(option);
+                                });
+                            });
                             hlsPlayer.on(Hls.Events.ERROR, (_, errorData) => {
                                 if (errorData.fatal) {
                                     onPlayerError({
@@ -571,11 +742,14 @@
                                 }
                             });
                             videoPlayer.classList.remove("d-none");
+                            if (isVodStream || preferCategoryHls) {
+                                movieControls.classList.remove('d-none');
+                            }
                             renderEpgForChannel(item);
                             return;
                         }
 
-                        if (isMpegTsStream && typeof mpegts !== 'undefined' && mpegts.isSupported() && !item.key) {
+                        if (isMpegTsStream && !isVodStream && typeof mpegts !== 'undefined' && mpegts.isSupported() && !item.key) {
                             let hlsFallbackAttempted = false;
                             let mpegTsPlaybackStarted = false;
                             let mediaResetAttempted = false;
@@ -640,9 +814,31 @@
                         }
 
                         if (isProgressiveStream && !item.key) {
-                            videoPlayer.src = playableSource;
-                            videoPlayer.classList.remove("d-none");
-                            await videoPlayer.play().catch(() => {});
+                            const vodCandidates = getVodCandidates(item.source);
+                            let vodCandidateIndex = 0;
+                            const playVodSource = (source) => {
+                                videoPlayer.src = getPlayableSource(source);
+                                videoPlayer.classList.remove("d-none");
+                                movieControls.classList.remove('d-none');
+                                movieControlStatus.textContent = '';
+                                videoPlayer.play().catch(() => {});
+                            };
+
+                            videoPlayer._vodErrorHandler = () => {
+                                if (vodCandidateIndex < vodCandidates.length - 1) {
+                                    vodCandidateIndex += 1;
+                                    playVodSource(vodCandidates[vodCandidateIndex]);
+                                    return;
+                                }
+                                onPlayerError({
+                                    code: videoPlayer.error?.code,
+                                    message: 'Ovaj film provider ne nudi u web-kompatibilnom formatu.'
+                                });
+                            };
+                            videoPlayer.addEventListener('error', videoPlayer._vodErrorHandler);
+
+                            playVodSource(vodCandidates[vodCandidateIndex]);
+                            loadMovieSubtitles(item);
                             renderEpgForChannel(item);
                             return;
                         }
